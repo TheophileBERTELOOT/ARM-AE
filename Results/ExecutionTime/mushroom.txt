@@ -1,0 +1,6 @@
+Entrainement Model et creation de lois : 20.916516542434692
+Calcul mesures : 121.45839190483093
+Total : 142.37490844726562
+Recherche exhaustive : 0.5116314888000488
+Nombre de lois trouvees : 2508
+Nombre de lois regulieres trouvees : 140
