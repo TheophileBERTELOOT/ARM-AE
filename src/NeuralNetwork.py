@@ -7,7 +7,7 @@ import copy
 import time
 
 class NeuralNetwork:
-    def __init__(self,dataSize,baseline,lstm,gru,vae,conv,conv2D,recursiveModel,learningRate=1e-3,numEpoch=10,batchSize=128,dropout=0.5,hiddenSize='dataSize',output='relu',likeness=0.4):
+    def __init__(self,dataSize,baseline,lstm,gru,vae,conv,conv2D,recursiveModel,learningRate=1e-3,numEpoch=10,batchSize=128,dropout=0.5,hiddenSize='dataSize',output='relu',likeness=0.4,isPolypharmacy = False):
         self.baseline = baseline
         self.lstm = lstm
         self.gru = gru
@@ -21,6 +21,7 @@ class NeuralNetwork:
         self.hiddenSize = hiddenSize
         self.dropout = dropout
         self.output = output
+        self.isPolypharmacy = isPolypharmacy
         if self.hiddenSize == 'dataSize':
             self.hiddenSize = self.dataSize
         if self.recursiveModel:
@@ -35,6 +36,7 @@ class NeuralNetwork:
 
 
     def dataPretraitement(self,d):
+        self.columns = d.columns
         trainTensor = torch.tensor(d.values)
         dataLoader = DataLoader(trainTensor.float(), batch_size=self.batchSize, shuffle=True)
         # cv2.imshow('dataset', d.values)
@@ -68,13 +70,9 @@ class NeuralNetwork:
                   .format(epoch + 1, self.numEpoch, loss.data))
 
     def computeMeasures(self,data,antecedent,consequent):
-        if type(antecedent) == list:
-            searchColumns = [consequent]+antecedent
-            antD = data[data.columns[antecedent]]
-            antD = sum([sum(antD.loc[x]) == len(antecedent) for x in range(len(antD))]) / len(antD)
-        else:
-            searchColumns = [consequent,antecedent]
-            antD = data[data.columns[[antecedent]]].sum()[0] / len(data)
+        searchColumns = [consequent]+antecedent
+        antD = data[data.columns[antecedent]]
+        antD = sum([sum(antD.loc[x]) == len(antecedent) for x in range(len(antD))]) / len(antD)
         suppD = data[data.columns[searchColumns]]
         suppD = sum([sum(suppD.loc[x]) == len(searchColumns) for x in range(len(suppD))]) / len(suppD)
 
@@ -107,66 +105,50 @@ class NeuralNetwork:
         return mostPresentIndex
 
 
-    def generateRules(self,data,numberOfRules = 2,nbAntecedent=2):
+    def computeSimilarity(self, allAntecedents, antecedentsArray):
+        onlySameSize = [x for x in allAntecedents if len(x) >= len(antecedentsArray)]
+        maxSimilarity = 0
+        for antecedentIndex in range(len(onlySameSize)):
+            antecedents = onlySameSize[antecedentIndex]
+            similarity = 0
+            for item in antecedents:
+                if item in antecedentsArray:
+                    similarity+=1
+            similarity /= len(antecedentsArray)
+            if similarity > maxSimilarity:
+                maxSimilarity = similarity
+        return maxSimilarity
+
+    def generateRules(self,data,numberOfRules = 2,nbAntecedent=2,outcomeIndex=473):
         print('begin rules generation')
-        showImage = True
-        averageSupport = 0
-        averageCosine = 0
-        averageConfidence = 0
         timeCreatingRule = 0
         timeComputingMeasure = 0
-        mostPresent = list(self.findMostPresentItem(data))
-        print('Most present')
-        print(mostPresent)
-        for consequent in range(self.dataSize):
+        nbConsequent = self.dataSize
+        if self.isPolypharmacy:
+            nbConsequent = 1
+        for consequent in range(nbConsequent):
+
             if consequent%10==0 :
                 print('progress : '+str(round(consequent/self.dataSize,2))+' %')
-            if self.conv or self.conv2D:
-                consequentArray = np.zeros((self.dataSize,self.batchSize))
-                consequentArray[:,consequent] = 1
-                consequentArray = consequentArray.reshape((self.dataSize, self.batchSize,1))
-                if showImage and consequent%10==0:
-                    cv2.imshow('consequent', np.array(consequentArray))
-                consequentArray = torch.tensor(consequentArray).cuda()
+            consequentArray = np.zeros(self.dataSize)
+
+            if self.isPolypharmacy:
+                consequentArray[outcomeIndex] = 1
             else:
-
-                consequentArray = np.zeros(self.dataSize)
                 consequentArray[consequent] = 1
-                consequentArray = torch.tensor(consequentArray).cuda()
-                consequentArray = consequentArray.unsqueeze(0)
-
-
+            consequentArray = torch.tensor(consequentArray).cuda()
+            consequentArray = consequentArray.unsqueeze(0)
             output = self.model(consequentArray.float())
             output = output.cpu()
             output = np.array(output.detach().numpy())
-
-            if  self.conv2D:
-                output = pd.DataFrame(output.reshape(self.dataSize, self.batchSize))
-            else:
-                output = pd.DataFrame(output.reshape(self.dataSize, -1))
-
+            output = pd.DataFrame(output.reshape(self.dataSize, -1))
             output = pd.DataFrame(output)
-
-
-            if self.conv2D or self.conv:
-                antecedentsArray = output.loc[0].nlargest(numberOfRules)
-                if showImage and consequent%10==0:
-                    imageOutput = output.to_numpy()
-                    imageOutput = (imageOutput * 255).astype(np.uint8)
-                    imageOutput = imageOutput.reshape((self.dataSize, self.batchSize, 1))
-                    cv2.imshow('antecedent', imageOutput)
-                    cv2.waitKey(0)
-            else:
-                antecedentsArray = output[0].nlargest(len(data.loc[0]))
 
             t1 = time.time()
             if self.recursiveModel:
                 allAntecedents = []
-                allAntecedentsArray = []
-                maxCommonAntecedents = int(nbAntecedent*self.likeness)+1
                 for j in range(numberOfRules):
                     antecedentsArray = []
-                    nbCommonAntecedent = 0
                     for i in range(nbAntecedent):
                         consequentArray = np.zeros(self.dataSize)
                         consequentArray[consequent] = 1
@@ -177,22 +159,17 @@ class NeuralNetwork:
                         output = output.cpu()
                         output = np.array(output.detach().numpy())
                         output = pd.DataFrame(output.reshape(self.dataSize, -1))
-                        output = pd.DataFrame(output)
                         potentialAntecedentsArray = output[0].nlargest(len(data.loc[0]))
                         for antecedent in potentialAntecedentsArray.keys():
-                            if antecedent != consequent and antecedent not in antecedentsArray and antecedent not in allAntecedents:
-                                if nbCommonAntecedent<maxCommonAntecedents:
+                            potentialAntecedents = copy.deepcopy(antecedentsArray)
+                            potentialAntecedents.append(antecedent)
+                            potentialAntecedents = sorted(potentialAntecedents)
+                            if antecedent != consequent and antecedent not in antecedentsArray and self.computeSimilarity(allAntecedents,potentialAntecedents) <= self.likeness:
                                     antecedentsArray.append(antecedent)
-                                    allAntecedents.append(antecedent)
-                                    nbCommonAntecedent += 1
                                     break
-                                else:
-                                    if antecedent not in allAntecedents:
-                                        antecedentsArray.append(antecedent)
-                                        allAntecedents.append(antecedent)
-                                        break
-                        if antecedentsArray not in allAntecedentsArray:
-                            t3 = time.time()
+
+                        t3 = time.time()
+                        if not self.isPolypharmacy or (self.isPolypharmacy and len(antecedentsArray ==nbAntecedent)):
                             support, confidence, cosine = self.computeMeasures(data, copy.deepcopy(antecedentsArray), consequent)
                             t4 = time.time()
                             timeComputingMeasure += t4-t3
@@ -202,46 +179,27 @@ class NeuralNetwork:
                                 confidence = 0
                             if np.isnan(cosine):
                                 cosine = 0
-                            self.results.append({
-                                'antecedent': sorted(copy.deepcopy(antecedentsArray)),
-                                'consequent': consequent,
-                                'support': round(support, 2),
-                                'confidence': round(confidence, 2),
-                                'cosine': round(cosine, 2)
-                            })
-                            averageSupport+=round(support, 2)
-                            averageCosine+=round(cosine, 2)
-                            averageConfidence+=round(confidence, 2)
-                            allAntecedentsArray.append(copy.deepcopy(antecedentsArray))
-            else:
-                for antecedent in antecedentsArray.keys():
-                    if antecedent != consequent:
-                        t3 = time.time()
-                        support,confidence,cosine = self.computeMeasures(data,antecedent,consequent)
-                        t4 = time.time()
-                        timeComputingMeasure += t4 - t3
-                        if np.isnan(support):
-                            support = 0
-                        if np.isnan(confidence):
-                            confidence = 0
-                        if np.isnan(cosine):
-                            cosine = 0
-
-                        self.results.append({
-                            'antecedent':sorted(antecedent),
-                            'consequent':consequent,
-                            'support':round(support,2),
-                            'confidence':round(confidence,2),
-                            'cosine':round(cosine,2)
-                        })
+                            if self.isPolypharmacy:
+                                self.results.append({
+                                    'antecedent': self.columns[sorted(copy.deepcopy(antecedentsArray))],
+                                    'consequent': self.columns[consequent],
+                                    'support': support,
+                                    'confidence': confidence,
+                                    'cosine': round(cosine, 2)
+                                })
+                            else:
+                                self.results.append({
+                                    'antecedent': sorted(copy.deepcopy(antecedentsArray)),
+                                    'consequent': consequent,
+                                    'support': support,
+                                    'confidence': confidence,
+                                    'cosine': round(cosine, 2)
+                                })
+                            allAntecedents.append(sorted(copy.deepcopy(antecedentsArray)),)
             t2 = time.time()
             timeCreatingRule += t2 - t1
-        averageSupport= averageSupport / (numberOfRules*self.dataSize)
-        averageConfidence= averageConfidence / (numberOfRules*self.dataSize)
-        averageCosine= averageCosine / (numberOfRules*self.dataSize)
-
         timeCreatingRule -= timeComputingMeasure
-        return round(averageSupport+averageCosine+averageConfidence,2),timeCreatingRule,timeComputingMeasure
+        return timeCreatingRule,timeComputingMeasure
 
     def generateReport(self,path):
         file = open(path, "w")

@@ -87,47 +87,67 @@ class BenchmarkManager():
     def ExhaustiveSearch(self,df, path_laws, min_supp,min_conf,nbAntecedent=1,dataset='Mushroom',nbRules=2):
         # df = pd.read_csv('Data/synth_transformed.csv')
         t1 = time.time()
+        print(nbAntecedent)
         frequent_itemsets = fpgrowth(df, min_support=min_supp,max_len=nbAntecedent+1)
         print('fini avec les itemsets')
-        print(frequent_itemsets)
+
         self.exhauRules = association_rules(frequent_itemsets, metric="confidence", min_threshold=min_conf)
         print(self.exhauRules)
+        nbLoisInit = str(len(self.exhauRules))
+        print(nbLoisInit)
+        t2 = time.time()
         self.exhauRules = self.exhauRules[self.exhauRules.consequents.apply(lambda x: len(x) == 1)]
         self.exhauRules = self.exhauRules.reset_index()
-        t2 = time.time()
-        file = open('Results/ExecutionTime/'+dataset+'.txt', "a")
-        file.write('Recherche exhaustive : ' + str(t2 - t1) + '\n'
-                   +'Nombre de lois trouvees : '+str(len(self.exhauRules))+'\n')
-        file.close()
+        self.exhauRules = self.exhauRules.sort_values(by=['support'], ignore_index=True, ascending=False)
+
         temp = []
-        nbRulesFind =  [0 for _ in range(len(df.loc[0]))]
+        nbRulesFind =  [[0 for _ in range(len(df.loc[0]))] for _ in range(nbRules)]
         for ruleIndex in range(len(self.exhauRules)):
             rule = self.exhauRules.loc[ruleIndex]
 
-            if len(rule['consequents'])==1 and nbRulesFind[list(rule['consequents'])[0]]<nbRules:
+            if len(rule['consequents'])==1 and nbRulesFind[len(list(rule['antecedents']))-1][list(rule['consequents'])[0]]<nbRules:
                 temp.append({'antecedent':sorted(list(rule['antecedents'])),
                              'consequent':list(rule['consequents']),
                              'support':round(rule['support'],2),
                              'confiance':round(rule['confidence'],2)})
-                nbRulesFind[list(rule['consequents'])[0]]+=1
+                nbRulesFind[len(list(rule['antecedents']))-1][list(rule['consequents'])[0]]+=1
         self.exhauRules = pd.DataFrame(temp)
         print(self.exhauRules)
-        self.exhauRules = self.exhauRules.sort_values(by=['support'],ignore_index=True,ascending=False).head(500)
+        t3 = time.time()
+        ttNbRules = sum([sum(x) for x in nbRulesFind])
+        file = open('Results/ExecutionTime/'+dataset+'.txt', "a")
+        file.write('Recherche exhaustive exec time : ' + str(t2 - t1) + '\n'
+                    +'Transformation des lois exec time: ' + str(t3 - t2) + '\n'
+                   + 'Total  exec time: ' + str(t3 - t1) + '\n'
+                   +'Nombre de lois trouvees : '+nbLoisInit+'\n'
+                   +'Support FP : '+str(np.mean(self.exhauRules['support'])) +'\n'
+                   + 'confiance FP : '+str(np.mean(self.exhauRules['confiance']))+'\n'
+                   +'Nombre de lois regulieres trouvees : ' + str(ttNbRules) + '\n')
+        file.close()
+        print('support average')
+        print(np.mean(self.exhauRules['support']))
+        print('confiance average')
+        print(np.mean(self.exhauRules['confiance']))
         self.exhauRules.to_csv(path_laws)
         print(nbRulesFind)
-        file = open('Results/ExecutionTime/' + dataset + '.txt', "a")
-        file.write('Nombre de lois regulieres trouvees : ' + str(sum(nbRulesFind)) + '\n')
-        file.close()
+
 
     def ruleIsInRulesDf(self,antecedent,consequent,rulesDf):
+        if '[' in consequent:
+            consequent = int(consequent.replace('[', '').replace(']', ''))
+        if '[' in antecedent:
+            antecedent = antecedent.replace('[', '').replace(']', '')
+            antecedent = antecedent.split(',')
+            antecedent = [ int(x) for x in antecedent]
         for ruleIndex in range(len(rulesDf)):
             testRule = rulesDf.loc[ruleIndex]
+
             if antecedent == testRule['antecedent'] and consequent == testRule['consequent']:
                 return True
         return False
 
 
-    def CompareToExhaustive(self,df,pathRules,min_supp,min_conf,resultPath,threshold=0.1,nbAntecedent=1,dataset='Mushroom'):
+    def CompareToExhaustive(self,df,pathRules,min_supp,min_conf,resultPath,iteration,threshold=0.1,nbAntecedent=1,dataset='Mushroom',):
         f = open(resultPath, 'r')
         res = f.readlines()
         f.close()
@@ -136,9 +156,24 @@ class BenchmarkManager():
             score.append(json.loads(line))
         nnR = pd.DataFrame(score)
         nbNotNull = len(nnR[nnR['support']>0])
+        file = open('Results/ExecutionTime/' + dataset + '.txt', "a")
+        file.write('nbNotNull : ' + str(nbNotNull) + '\n'
+                   + 'support average ARM-AE: ' + str(np.mean(nnR['support'])) + '\n'
+                   + 'confiance average ARM-AE: ' + str(np.mean(nnR['confidence'])) + '\n'
+                   + 'there is  rules with a support greater than : ' + str(round(nbNotNull/len(nnR),2)) + '\n')
+        file.close()
+        print('nbNotNull')
+        print(nbNotNull)
+        print('support average ARM-AE')
+        print(np.mean(nnR['support']))
+        print('confiance average ARM-AE')
+        print(np.mean(nnR['confidence']))
         print('there is {percent} % of rules with a support greater than {threshold}'.format(percent=round(nbNotNull/len(nnR),2),threshold={0}))
-
-        self.ExhaustiveSearch(df,pathRules,min_supp,min_conf,nbAntecedent=nbAntecedent,dataset=dataset)
+        if iteration == 0:
+            self.ExhaustiveSearch(df,pathRules,min_supp,min_conf,nbAntecedent=nbAntecedent,dataset=dataset)
+        else:
+            self.exhauRules = pd.read_csv(pathRules,index_col=0)
+            print(self.exhauRules)
         f = open(resultPath,'r')
         res = f.readlines()
         f.close()
@@ -170,7 +205,12 @@ class BenchmarkManager():
                 nbFoundAccu += 1
 
 
-
+        file = open('Results/ExecutionTime/' + dataset + '.txt', "a")
+        file.write('with min_supp = {min_supp} and min_conf = {min_conf} and {nbRules} proposed'.format(min_supp=min_supp,min_conf=min_conf,nbRules=nbSearch)+ '\n'
+                   + 'Percentage of the 100 best rules found with NN : {}'.format(round(nbFoundRecall/nbSearch,2)) + '\n'
+                   + 'Percentage of the rules found with NN in the top 500 : {}'.format(round(nbFoundAccu / len(nnR), 2))+ '\n'
+                   )
+        file.close()
         print('with min_supp = {min_supp} and min_conf = {min_conf} and {nbRules} proposed'.format(min_supp=min_supp,min_conf=min_conf,nbRules=nbSearch))
         print('Percentage of the 100 best rules found with NN : {}'.format(round(nbFoundRecall/nbSearch,2)))
         print('Percentage of the rules found with NN in the top 500 : {}'.format(round(nbFoundAccu / len(nnR), 2)))

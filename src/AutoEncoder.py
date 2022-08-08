@@ -57,6 +57,22 @@ class AutoEncoder(nn.Module):
                 nn.Linear(self.dataSize, self.hiddenSize),
                 outputLayer,
             )
+            # self.encoder = nn.Sequential(
+            #     nn.Linear(self.dataSize, int(self.dataSize*0.9)),
+            #     outputLayer,
+            #     nn.Linear(int(self.dataSize*0.9), int(self.dataSize*0.8)),
+            #     outputLayer,
+            #     nn.Linear(int(self.dataSize*0.8), int(self.dataSize*0.7)),
+            #     outputLayer,
+            # )
+            # self.decoder = nn.Sequential(
+            #     nn.Linear(int(self.dataSize*0.7), int(self.dataSize*0.8)),
+            #     outputLayer,
+            #     nn.Linear(int(self.dataSize*0.8), int(self.dataSize*0.9)),
+            #     outputLayer,
+            #     nn.Linear(int(self.dataSize*0.9), self.dataSize),
+            #     outputLayer,
+            # )
         elif conv:
             self.conv1 = nn.Conv1d(self.dataSize, 16, 3,padding=1)
             self.conv2 = nn.Conv1d(16,32, 3, padding=1)
