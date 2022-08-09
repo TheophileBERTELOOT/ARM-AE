@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import torch
 from src.AutoEncoder import *
-import cv2
+
 import copy
 import time
 
@@ -45,6 +45,10 @@ class NeuralNetwork:
         torch.nan_to_num(x, nan=0.0, posinf=0.0)
         return dataLoader
 
+    def save(self,p):
+        self.model.save(p)
+    def load(self,p):
+        self.model.load(p)
     def train(self,dataLoader):
         showImage = True
         for epoch in range(self.numEpoch):

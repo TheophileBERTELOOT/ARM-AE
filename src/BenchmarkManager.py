@@ -3,8 +3,8 @@ from os.path import isfile, join
 import numpy as np
 import pandas as pd
 import json
-import seaborn as sns
-import matplotlib.pyplot as plt
+
+
 from mlxtend.preprocessing import TransactionEncoder
 from mlxtend.frequent_patterns import apriori, fpmax, fpgrowth
 from mlxtend.frequent_patterns import association_rules

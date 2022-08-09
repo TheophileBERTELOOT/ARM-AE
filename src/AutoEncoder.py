@@ -121,6 +121,16 @@ class AutoEncoder(nn.Module):
 
 
 
+    def save(self,p):
+        torch.save(self.encoder.state_dict(), p+'encoder.pt')
+        torch.save(self.decoder.state_dict(),p+'decoder.pt')
+
+    def load(self,p):
+        self.encoder.load_state_dict(torch.load(p+'encoder.pt'))
+        self.decoder.load_state_dict(torch.load(p + 'decoder.pt'))
+        self.encoder.eval()
+        self.decoder.eval()
+
     def forward(self, x):
         if self.baseline:
             x = torch.tensor(x[None, :])

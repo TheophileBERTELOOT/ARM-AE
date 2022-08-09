@@ -4,8 +4,10 @@ from src.NeuralNetwork import *
 from src.BenchmarkManager import *
 import time
 
-datasetName = 'plants'
+datasetName = 'mushroom'
 isPolypharmacie = True
+isLoadedModel = False
+modelPath = 'models/'
 outcomeIndex = 473
 # data = pd.read_csv('data/iris.csv',dtype=float,header=0,index_col=0)
 data = pd.read_csv('data/'+datasetName+'.csv',index_col=0,dtype=float,header=0)
@@ -26,7 +28,14 @@ for i in range(10):
 # # NN = NeuralNetwork(dataSize,False,False,False,False,False,True,numEpoch=100,output='relu',batchSize=dataSize)
 
     t1 = time.time()
-    NN.train(dataLoader)
+    if isLoadedModel:
+        NN.load(modelPath)
+    else:
+        NN.train(dataLoader)
+        try:
+            NN.save(modelPath)
+        except:
+            print('dommage bien tente')
     t2 = time.time()
     timeCreatingRule,timeComputingMeasure = NN.generateRules(data,numberOfRules=100,nbAntecedent=5,outcomeIndex=outcomeIndex)
 
