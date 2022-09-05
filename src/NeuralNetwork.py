@@ -7,19 +7,21 @@ import copy
 import time
 
 class NeuralNetwork:
-    def __init__(self,dataSize,baseline,lstm,gru,vae,conv,conv2D,recursiveModel,learningRate=1e-3,numEpoch=10,batchSize=128,dropout=0.5,hiddenSize='dataSize',output='relu',likeness=0.4,isPolypharmacy = False):
+    def __init__(self,dataSize,baseline,lstm,gru,vae,conv,conv2D,recursiveModel,learningRate=1e-3,numEpoch=10,batchSize=128,dropout=0.5,hiddenSize='dataSize',output='relu',likeness=0.4,isPolypharmacy = False,con=None,columns=[]):
         self.baseline = baseline
         self.lstm = lstm
         self.gru = gru
         self.vae = vae
         self.conv = conv
         self.conv2D = conv2D
+        self.con = con
         self.recursiveModel = recursiveModel
         self.dataSize = dataSize
         self.learningRate = learningRate
         self.likeness = likeness
         self.hiddenSize = hiddenSize
         self.dropout = dropout
+        self.columns = columns
         self.output = output
         self.isPolypharmacy = isPolypharmacy
         if self.hiddenSize == 'dataSize':
@@ -31,7 +33,7 @@ class NeuralNetwork:
         self.model = AutoEncoder(self.dataSize,self.baseline,self.lstm,self.gru,self.vae,self.conv,self.conv2D,self.dropout,self.hiddenSize,self.output).cuda()
         self.criterion = nn.MSELoss()
         self.optimizer = torch.optim.Adam(
-            self.model.parameters(), lr=self.learningRate, weight_decay=1e-5)
+            self.model.parameters(), lr=self.learningRate)
         self.results = []
 
 
@@ -73,23 +75,85 @@ class NeuralNetwork:
             print('epoch [{}/{}], loss:{:.4f}'
                   .format(epoch + 1, self.numEpoch, loss.data))
 
-    def computeMeasures(self,data,antecedent,consequent):
-        searchColumns = [consequent]+antecedent
-        antD = data[data.columns[antecedent]]
-        antD = sum([sum(antD.loc[x]) == len(antecedent) for x in range(len(antD))]) / len(antD)
-        suppD = data[data.columns[searchColumns]]
-        suppD = sum([sum(suppD.loc[x]) == len(searchColumns) for x in range(len(suppD))]) / len(suppD)
+    def computeMeasures(self,antecedent,consequent):
+        datasize = 298167971
+        # datasize = 50000
+        data = pd.read_sql_query("SELECT * from POLY LIMIT 1", self.con)
+        data = data.drop(['AGE_AT_DEATH', 'AGE_AT_HOSPIT', 'AGE_AT_START', 'AGE_AT_END', 'ID_INDV8', 'DECES', 'ROWID'],
+                         axis=1)
+        searchColumns = [consequent] + antecedent
+        searchColumnsNames = data.columns[searchColumns]
+        requestLineSupp = ' '.join(['"'+searchColumnsNames[k] + '"'+" = '1' AND " for k in range(len(searchColumns))])
+        requestLineSupp = requestLineSupp[:-4]
+        antecedentNames = data.columns[antecedent]
+        requestLineAnt = ' '.join(['"'+antecedentNames[k] + '"'+" = '1' AND " for k in range(len(antecedent))])
+        requestLineAnt = requestLineAnt[:-4]
+        consequentNames = data.columns[consequent]
+        requestLinePNonANonC = ' '.join(['"'+searchColumnsNames[k] + '"'+" = '0' AND " for k in range(len(searchColumns))])
+        requestLinePNonANonC = requestLinePNonANonC[:-4]
+        requestLinePANonC = ' '.join(['"' + antecedentNames[k] + '"' + " = '1' AND " for k in range(len(antecedent))])
+        requestLinePANonC += '"HOSPIT" = '+"'0'"
+        requestLinePNonAC = ' '.join(['"' + antecedentNames[k] + '"' + " = '0' AND " for k in range(len(antecedent))])
+        requestLinePNonAC += '"HOSPIT"= '+"'1'"
 
-        if antD == 0:
-            confD = 0
+        print('rules : ')
+        print('antecedent : '+str(list(self.columns[antecedent])))
+        print('consequent : '+str(self.columns[consequent]))
+
+        PC = 8695061
+
+
+
+        print(requestLineSupp)
+        PAC = pd.read_sql_query('SELECT COUNT(*) from POLY  WHERE '+requestLineSupp,self.con)
+        PAC = int(PAC.loc[0])
+        print(PAC)
+
+        print(requestLineAnt)
+        PA = pd.read_sql_query('SELECT COUNT(*) from POLY  WHERE ' + requestLineAnt, self.con)
+        PA = int(PA.loc[0])
+        PNonA = datasize-PA
+        print(PA)
+
+        PNonANonC = pd.read_sql_query('SELECT COUNT(*) from POLY  WHERE ' + requestLinePNonANonC, self.con)
+        PNonANonC = int(PNonANonC.loc[0])
+
+        PANonC = pd.read_sql_query('SELECT COUNT(*) from POLY  WHERE ' + requestLinePANonC, self.con)
+        PANonC = int(PANonC.loc[0])
+
+        PNonAC = pd.read_sql_query('SELECT COUNT(*) from POLY  WHERE ' + requestLinePNonAC, self.con)
+        PNonAC = int(PNonAC.loc[0])
+
+        print('divided by datasize : ')
+        PA/=datasize
+        PNonA/=datasize
+        print(PA)
+        PAC/=datasize
+        print(PAC)
+        PC/=datasize
+        print(PC)
+        PNonANonC /= datasize
+        print(PNonANonC)
+        PANonC /= datasize
+        print(PANonC)
+        PNonAC /= datasize
+        print(PNonAC)
+
+        if PA == 0:
+            conf = 0
         else:
-            confD = suppD / antD
-        cons = (data[data.columns[[consequent]]].sum()[0] / len(data))
-        if antD == 0 or cons==0:
-            cosD = 0
+            conf = PAC / PA
+
+        if PA == 0 or PC==0:
+            cos = 0
         else:
-            cosD = suppD / np.sqrt(cons * antD)
-        return suppD,confD,cosD
+            cos = PAC / np.sqrt(PC * PA)
+
+        yule = (PAC*PNonANonC - PANonC*PNonAC)/(PAC*PNonANonC + PANonC*PNonAC)
+
+        relativeRisk = (PAC/PA)/(PNonAC/PNonA)
+
+        return PAC,conf,cos,yule,relativeRisk
 
 
 
@@ -109,29 +173,39 @@ class NeuralNetwork:
         return mostPresentIndex
 
 
-    def computeSimilarity(self, allAntecedents, antecedentsArray):
+    def computeSimilarity(self, allAntecedents, antecedentsArray,nbantecedent):
         onlySameSize = [x for x in allAntecedents if len(x) >= len(antecedentsArray)]
         maxSimilarity = 0
+        print('allAntecedents')
+        print(allAntecedents)
         for antecedentIndex in range(len(onlySameSize)):
             antecedents = onlySameSize[antecedentIndex]
             similarity = 0
+            print('antecedents')
+            print(antecedents)
+            print('antecedentsArray')
+            print(antecedentsArray)
             for item in antecedents:
                 if item in antecedentsArray:
                     similarity+=1
-            similarity /= len(antecedentsArray)
+            similarity /= nbantecedent
             if similarity > maxSimilarity:
                 maxSimilarity = similarity
+        print(maxSimilarity)
         return maxSimilarity
 
-    def generateRules(self,data,numberOfRules = 2,nbAntecedent=2,outcomeIndex=473):
+    def generateRules(self,data,numberOfRules = 2,nbAntecedent=2,outcomeIndex=473,path = ''):
         print('begin rules generation')
         timeCreatingRule = 0
         timeComputingMeasure = 0
         nbConsequent = self.dataSize
+        file = open(path, "a")
         if self.isPolypharmacy:
             nbConsequent = 1
+            
         for consequent in range(nbConsequent):
-
+            if self.isPolypharmacy:
+                consequent = outcomeIndex
             if consequent%10==0 :
                 print('progress : '+str(round(consequent/self.dataSize,2))+' %')
             consequentArray = np.zeros(self.dataSize)
@@ -152,6 +226,8 @@ class NeuralNetwork:
             if self.recursiveModel:
                 allAntecedents = []
                 for j in range(numberOfRules):
+                    if j % 10 == 0 and self.isPolypharmacy:
+                        print('progress : ' + str(round(j / numberOfRules, 2)) + ' %')
                     antecedentsArray = []
                     for i in range(nbAntecedent):
                         consequentArray = np.zeros(self.dataSize)
@@ -168,41 +244,54 @@ class NeuralNetwork:
                             potentialAntecedents = copy.deepcopy(antecedentsArray)
                             potentialAntecedents.append(antecedent)
                             potentialAntecedents = sorted(potentialAntecedents)
-                            if antecedent != consequent and antecedent not in antecedentsArray and self.computeSimilarity(allAntecedents,potentialAntecedents) <= self.likeness:
+                            if antecedent != consequent and antecedent not in antecedentsArray and self.computeSimilarity(allAntecedents,potentialAntecedents,nbAntecedent) <= self.likeness:
                                     antecedentsArray.append(antecedent)
                                     break
 
                         t3 = time.time()
-                        if not self.isPolypharmacy or (self.isPolypharmacy and len(antecedentsArray ==nbAntecedent)):
-                            support, confidence, cosine = self.computeMeasures(data, copy.deepcopy(antecedentsArray), consequent)
-                            t4 = time.time()
-                            timeComputingMeasure += t4-t3
-                            if np.isnan(support):
-                                support = 0
-                            if np.isnan(confidence):
-                                confidence = 0
-                            if np.isnan(cosine):
-                                cosine = 0
-                            if self.isPolypharmacy:
-                                self.results.append({
-                                    'antecedent': self.columns[sorted(copy.deepcopy(antecedentsArray))],
-                                    'consequent': self.columns[consequent],
-                                    'support': support,
-                                    'confidence': confidence,
-                                    'cosine': round(cosine, 2)
-                                })
-                            else:
-                                self.results.append({
-                                    'antecedent': sorted(copy.deepcopy(antecedentsArray)),
-                                    'consequent': consequent,
-                                    'support': support,
-                                    'confidence': confidence,
-                                    'cosine': round(cosine, 2)
-                                })
+
+                        support, confidence, cosine, yule ,RR = self.computeMeasures( copy.deepcopy(antecedentsArray), consequent)
+                        t4 = time.time()
+                        timeComputingMeasure += t4-t3
+                        if np.isnan(support):
+                            support = 0
+                        if np.isnan(confidence):
+                            confidence = 0
+                        if np.isnan(cosine):
+                            cosine = 0
+                        if np.isnan(yule):
+                            yule = 0
+                        if np.isnan(RR):
+                            RR = 0
+                        if self.isPolypharmacy:
+                            self.results.append({
+                                'antecedent': list(self.columns[sorted(copy.deepcopy(antecedentsArray))]),
+                                'consequent': self.columns[consequent],
+                                'support': support,
+                                'confidence': confidence,
+                                'cosine': cosine,
+                                'yule':yule,
+                                'RR':RR
+                            })
+                            lineStr = str({
+                                'antecedent': list(self.columns[sorted(copy.deepcopy(antecedentsArray))]),
+                                'consequent': self.columns[consequent],
+                                'support': support,
+                                'confidence': confidence,
+                                'cosine': cosine,
+                                'yule': yule,
+                                'RR':RR
+                            })
+                            print(lineStr)
+                            json_acceptable_string = lineStr.replace("'", "\"")
+                            file.write(json_acceptable_string)
+                            file.write('\n')
+
                             allAntecedents.append(sorted(copy.deepcopy(antecedentsArray)),)
             t2 = time.time()
             timeCreatingRule += t2 - t1
         timeCreatingRule -= timeComputingMeasure
+        file.close()
         return timeCreatingRule,timeComputingMeasure
 
     def generateReport(self,path):
