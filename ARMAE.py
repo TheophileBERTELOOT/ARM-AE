@@ -1,34 +1,39 @@
 import numpy as np
 import pandas as pd
 import torch
+from torch.nn import L1Loss
+
 from AutoEncoder import *
 
 import copy
 import time
 
 
-class NeuralNetwork:
+
+
+class ARMAE:
     def __init__(self, dataSize,  learningRate=1e-3, maxEpoch=10,
-                 batchSize=128,  hiddenSize='dataSize',  likeness=0.4, maxLossDifference=0.01, goalLoss=0.0001,
-                 con=None, columns=[], IM=['support','confidence']):
-        self.con = con
-        self.maxLossDifference=maxLossDifference
-        self.goalLoss=goalLoss
+                 batchSize=128,  hiddenSize='dataSize',  likeness=0.4,columns=[],isLoadedModel=False, IM=['support','confidence']):
         self.dataSize = dataSize
         self.learningRate = learningRate
         self.likeness = likeness
         self.IM=IM
         self.hiddenSize = hiddenSize
+        self.isLoadedModel = isLoadedModel
         self.columns = columns
         if self.hiddenSize == 'dataSize':
             self.hiddenSize = self.dataSize
         self.maxEpoch = maxEpoch
+        self.x = []
+        self.y_ = []
         self.batchSize = batchSize
         self.model = AutoEncoder(self.dataSize).cuda()
-        self.criterion = nn.MSELoss()
+        self.criterion = L1Loss()
         self.optimizer = torch.optim.Adam(
         self.model.parameters(), lr=self.learningRate)
+
         self.results = []
+
 
     def dataPretraitement(self, d):
         self.columns = d.columns
@@ -41,32 +46,28 @@ class NeuralNetwork:
     def save(self, p):
         self.model.save(p)
 
-    def load(self, p):
-        self.model.load(p)
+    def load(self, encoderPath,decoderPath):
+        self.model.load(encoderPath,decoderPath)
 
     def train(self, dataLoader,modelPath):
-        previousLoss = 0
+
         for epoch in range(self.maxEpoch):
             for data in dataLoader:
                 d = Variable(data).cuda()
                 output = self.model.forward(d)
-
+                self.y_ = output[0]
+                self.x = d
                 loss = self.criterion(output[0], d)
-
                 loss.backward()
+
                 self.optimizer.step()
                 self.optimizer.zero_grad()
-            self.save(modelPath+str(epoch))
-            # ===================log========================
+            if not self.isLoadedModel:
+                self.save(modelPath+str(epoch))
+
             print('epoch [{}/{}], loss:{:.4f}'
                   .format(epoch + 1, self.maxEpoch, loss.data))
-            if loss.data < self.goalLoss:
-                self.model.eval()
-                break
-            if loss.data - previousLoss    >self.maxLossDifference and epoch !=0:
-                self.load(modelPath+str(epoch-1))
-                break
-            previousLoss=loss.data
+
         return epoch
 
 
@@ -81,7 +82,7 @@ class NeuralNetwork:
             PAC = PAC==len(rules)
             PAC = np.sum(PAC)
             PAC = PAC/len(data)
-            measures.append(PAC)
+            measures.append(round(PAC,2))
         if 'confidence' in self.IM:
             PA = data[data.columns[antecedent]]
             PA = np.sum(PA, axis=1)
@@ -92,7 +93,7 @@ class NeuralNetwork:
                 conf = PAC/PA
             else:
                 conf = 0
-            measures.append(conf)
+            measures.append(round(conf,2))
         return measures
 
 
@@ -111,7 +112,7 @@ class NeuralNetwork:
                 maxSimilarity = similarity
         return maxSimilarity
 
-    def generateRules(self, data, numberOfRules=2, nbAntecedent=2, outcomeIndex=473, path=''):
+    def generateRules(self, data, numberOfRules=2, nbAntecedent=2, path=''):
         print('begin rules generation')
         timeCreatingRule = 0
         timeComputingMeasure = 0
@@ -150,9 +151,8 @@ class NeuralNetwork:
                     allAntecedents.append(sorted(copy.deepcopy(antecedentsArray)))
                     timeCreatingRule+=t2-t1
                     timeComputingMeasure+=t3-t2
-        df = pd.DataFrame(self.results,columns=['antecedent','consequent']+self.IM)
+        df = pd.DataFrame(self.results,columns=['antecedent','consequent','support','confidence'])
         df.to_csv(path)
-
         return timeCreatingRule, timeComputingMeasure
 
 

@@ -10,7 +10,7 @@ from mlxtend.frequent_patterns import apriori, fpmax, fpgrowth
 from mlxtend.frequent_patterns import association_rules
 import time
 
-from NeuralNetwork import NeuralNetwork
+from ARMAE import ARMAE
 
 
 class BenchmarkManager():
@@ -123,11 +123,9 @@ class BenchmarkManager():
 
         nnFindInFp = round(nbFoundRecall/nbSearch,2)
         FpFindInnn = round(nbFoundAccu / len(nnR), 2)
-        df = pd.DataFrame([[nnFindInFp,FpFindInnn]],columns=['nnFindInFp','FpFindInnn'])
-        df.to_csv('Results/ExecutionTime/' + dataset + 'findIn.csv')
         print('with min_supp = {min_supp} and min_conf = {min_conf} and {nbRules} proposed'.format(min_supp=min_supp,min_conf=min_conf,nbRules=nbSearch))
-        print('Percentage of the 100 best rules found with NN : {}'.format(round(nbFoundRecall/nbSearch,2)))
-        print('Percentage of the rules found with NN in the top 500 : {}'.format(round(nbFoundAccu / len(nnR), 2)))
+        print('Percentage of the best rules found with NN : {}'.format(round(nbFoundRecall/nbSearch,2)))
+        print('Percentage of the rules found with NN in the top rules : {}'.format(round(nbFoundAccu / len(nnR), 2)))
         results+=[nbNotNull,nnAvgSupp,nnAvgConf,nnFindInFp,FpFindInnn]
         return results
 
@@ -143,7 +141,7 @@ class BenchmarkManager():
             print(lr)
             for nbEpoch in nbEpochRange:
                 row = []
-                NN = NeuralNetwork(dataSize, False, False, False, False, False, False, True, numEpoch=nbEpoch, output='tanh',
+                NN = ARMAE(dataSize, False, False, False, False, False, False, True, numEpoch=nbEpoch, output='tanh',
                                    learningRate=lr)
                 dataLoader = NN.dataPretraitement(data)
                 NN.train(dataLoader)

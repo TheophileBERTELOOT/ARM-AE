@@ -31,9 +31,9 @@ class AutoEncoder(nn.Module):
         torch.save(self.encoder.state_dict(), p+'encoder.pt')
         torch.save(self.decoder.state_dict(),p+'decoder.pt')
 
-    def load(self,p):
-        self.encoder.load_state_dict(torch.load(p+'encoder.pt'))
-        self.decoder.load_state_dict(torch.load(p + 'decoder.pt'))
+    def load(self,encoderPath,decoderPath):
+        self.encoder.load_state_dict(torch.load(encoderPath))
+        self.decoder.load_state_dict(torch.load(decoderPath))
         self.encoder.eval()
         self.decoder.eval()
 
