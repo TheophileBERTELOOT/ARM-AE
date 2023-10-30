@@ -23,11 +23,16 @@ nbAntecedents = 2
 minSupp = 0.01
 minConf = 0.01
 
+
+datasetName = 'nursery'
+
+
 ARMAEResultsPath= 'Results/NN/'
 exhaustiveResultsPath = 'Results/Exhaustive/'
 overallResultsPath = 'Results/Final/'
+dataPath ='data/'+datasetName+'.csv'
 
-datasetName = 'nursery'
+
 
 isLoadedModel = False
 
@@ -38,7 +43,7 @@ modelPath = 'models/'
 encoderPath = 'models/1encoder.pt'
 decoderPath = 'models/1decoder.pt'
 
-data = pd.read_csv('../data/'+datasetName+'.csv',index_col=0,dtype=float,header=0)
+data = pd.read_csv(dataPath,index_col=0,dtype=float,header=0)
 times = []
 
 columns = ['FpExecTime','FpTransformRuleTime','FpTotalTime','FpSupportAvg','FpConfAvg','nbNotNull','nnAvgSupp',
