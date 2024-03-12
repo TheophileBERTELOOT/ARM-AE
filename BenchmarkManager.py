@@ -98,7 +98,7 @@ class BenchmarkManager():
         print(nnAvgSupp)
         print('confiance average ARM-AE')
         print(nnAvgConf)
-        print('there is {percent} % of rules with a support greater than {threshold}'.format(percent=percentageNotNull,threshold={0}))
+        print('there is {percent} % of rules with a support greater than {threshold}'.format(percent=percentageNotNull,threshold=0))
         results = self.ExhaustiveSearch(df,pathRules,min_supp,min_conf,nbAntecedent=nbAntecedent,dataset=dataset)
         nbSearch = len(self.exhauRules)
         print('nb lois a trouver :'+str(nbSearch))
@@ -136,8 +136,6 @@ class BenchmarkManager():
         lrRange = [1* 10**-lrExpo for lrExpo in range(1,6)]
         nbEpochRange = [nbEpoch for nbEpoch in range(1,110,10)]
         for lr  in lrRange:
-
-
             print(lr)
             for nbEpoch in nbEpochRange:
                 row = []

@@ -55,6 +55,7 @@ scores = []
 
 
 dataSize = len(data.loc[0])
+print("size of the data is",dataSize)
 bm = BenchmarkManager('Results/', dataSize)
 # for goalLoss in goalLosses:
 for i in range(nbRun):
@@ -68,9 +69,14 @@ for i in range(nbRun):
     else:
         NN.load(encoderPath,decoderPath)
     t2 = time.time()
-
+    timeTraining = t2-t1
+    print(f"Total Time Taken in Training is: {timeTraining}")
     timeCreatingRule, timeComputingMeasure = NN.generateRules(data, numberOfRules=numberOfRules, nbAntecedent=nbAntecedents,
                                                      path=ARMAEResultsPath + datasetName + str(i)+'.csv')
+    t3 = time.time()
+    timeRuleGen = t3-t2
+    print(f"Total Time Taken in Generating Rules is: {timeRuleGen} using ARE-AE")
+
     timeTraining = t2-t1
     times.append([timeTraining,timeCreatingRule,timeComputingMeasure])
 
