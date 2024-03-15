@@ -46,7 +46,7 @@ class BenchmarkManager():
         for ruleIndex in range(len(self.exhauRules)):
             rule = self.exhauRules.loc[ruleIndex]
 
-            if len(rule['consequents'])==1 and  nbRulesFind[len(list(rule['antecedents']))-1][list(rule['consequents'])[0]]<nbRules:
+            if len(rule['consequents'])==1:
                 temp.append({'antecedent':sorted(list(rule['antecedents'])),
                              'consequent':list(rule['consequents']),
                              'support':round(rule['support'],3),
@@ -90,7 +90,7 @@ class BenchmarkManager():
         nbNotNull = len(nnR[nnR['support']>0])
         nnAvgSupp =  np.mean(nnR['support'])
         nnAvgConf = np.mean(nnR['confidence'])
-        percentageNotNull = round(nbNotNull/len(nnR),2)
+        percentageNotNull = round(nbNotNull/len(nnR),2) *100
         print(nnR)
         print('nbNotNull')
         print(nbNotNull)
@@ -98,7 +98,7 @@ class BenchmarkManager():
         print(nnAvgSupp)
         print('confiance average ARM-AE')
         print(nnAvgConf)
-        print('there is {percent} % of rules with a support greater than {threshold}'.format(percent=percentageNotNull,threshold={0}))
+        print('there is {percent} % of rules with a support greater than {threshold}'.format(percent=percentageNotNull,threshold=0))
         results = self.ExhaustiveSearch(df,pathRules,min_supp,min_conf,nbAntecedent=nbAntecedent,dataset=dataset)
         nbSearch = len(self.exhauRules)
         print('nb lois a trouver :'+str(nbSearch))
@@ -136,8 +136,6 @@ class BenchmarkManager():
         lrRange = [1* 10**-lrExpo for lrExpo in range(1,6)]
         nbEpochRange = [nbEpoch for nbEpoch in range(1,110,10)]
         for lr  in lrRange:
-
-
             print(lr)
             for nbEpoch in nbEpochRange:
                 row = []

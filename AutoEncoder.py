@@ -38,7 +38,7 @@ class AutoEncoder(nn.Module):
         self.decoder.eval()
 
     def forward(self, x):
-        x = torch.tensor(x[None, :])
+        x = x.clone().detach().requires_grad_(True)
         x = self.encoder(x)
         x = self.decoder(x)
         return x

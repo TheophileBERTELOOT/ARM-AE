@@ -8,7 +8,7 @@ from AutoEncoder import *
 import copy
 import time
 
-
+import tqdm
 
 
 class ARMAE:
@@ -116,9 +116,9 @@ class ARMAE:
         print('begin rules generation')
         timeCreatingRule = 0
         timeComputingMeasure = 0
-        for consequent in range(self.dataSize):
+        for consequent in tqdm.tqdm(range(self.dataSize)):
             if consequent % 10 == 0:
-                print('progress : ' + str(round(consequent / self.dataSize, 2)) + ' %')
+                print('progress : ' + str(round(consequent / self.dataSize, 2)*100) + ' %')
             allAntecedents = []
             for j in range(numberOfRules):
                 antecedentsArray = []
@@ -152,6 +152,8 @@ class ARMAE:
                     timeCreatingRule+=t2-t1
                     timeComputingMeasure+=t3-t2
         df = pd.DataFrame(self.results,columns=['antecedent','consequent','support','confidence'])
+        for row, value in df.iterrows():
+            pass
         df.to_csv(path)
         return timeCreatingRule, timeComputingMeasure
 

@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Mar 15 12:50:04 2024
+
+@author: fabtechsol
+"""
+
 import copy
 
 from BenchmarkManager import *
@@ -11,7 +19,7 @@ print(torch.cuda.is_available())
 
 nbRun = 2
 nbEpoch = 2
-batchSize = 128
+batchSize = 256
 learningRate=10e-3
 #the proportion of similar items in rule with the same consequents
 likeness = 0.5
@@ -72,25 +80,25 @@ for i in range(nbRun):
     t2 = time.time()
     timeTraining = t2-t1
     print(f"Total Time Taken in Training is: {timeTraining}")
+    path = ARMAEResultsPath + datasetName + str(i)+'.csv'
     timeCreatingRule, timeComputingMeasure = NN.generateRules(data, numberOfRules=numberOfRules, nbAntecedent=nbAntecedents,
-                                                     path=ARMAEResultsPath + datasetName + str(i)+'.csv')
+                                                     path=path)
     t3 = time.time()
     timeRuleGen = t3-t2
     print(f"Total Time Taken in Generating Rules is: {timeRuleGen} using ARE-AE")
 
     timeTraining = t2-t1
     times.append([timeTraining,timeCreatingRule,timeComputingMeasure])
-
-    firstScore = bm.CompareToExhaustive(data, exhaustiveResultsPath + datasetName + str(i) + '.csv', minSupp, minConf,
-                                            ARMAEResultsPath + datasetName + str(i) + '.csv', i,
-                                            nbAntecedent=nbAntecedents, dataset=datasetName)
-
-    scoresIter = copy.deepcopy(firstScore)
-    scoresIter += [timeCreatingRule,timeComputingMeasure,timeTraining,i]
-    scores.append(scoresIter)
-
-df = pd.DataFrame(scores,columns=columns)
-df.to_csv(overallResultsPath+datasetName+'.csv')
-
-
-
+    nnR = pd.read_csv(path)
+    nbNotNull = len(nnR[nnR['support']>0])
+    nnAvgSupp =  np.mean(nnR['support'])
+    nnAvgConf = np.mean(nnR['confidence'])
+    percentageNotNull = round(nbNotNull/len(nnR),2) *100
+    print(nnR)
+    print('nbNotNull')
+    print(nbNotNull)
+    print('support average ARM-AE')
+    print(nnAvgSupp)
+    print('confiance average ARM-AE')
+    print(nnAvgConf)
+    print('there is {percent} % of rules with a support greater than {threshold}'.format(percent=percentageNotNull,threshold=0))
