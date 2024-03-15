@@ -120,9 +120,9 @@ class ARMAE:
             if consequent % 10 == 0:
                 print('progress : ' + str(round(consequent / self.dataSize, 2)*100) + ' %')
             allAntecedents = []
-            for j in tqdm.tqdm(range(numberOfRules)):
+            for j in range(numberOfRules):
                 antecedentsArray = []
-                for i in tqdm.tqdm(range(nbAntecedent)):
+                for i in range(nbAntecedent):
                     t1 = time.time()
                     consequentArray = np.zeros(self.dataSize)
                     consequentArray[consequent] = 1
@@ -152,6 +152,8 @@ class ARMAE:
                     timeCreatingRule+=t2-t1
                     timeComputingMeasure+=t3-t2
         df = pd.DataFrame(self.results,columns=['antecedent','consequent','support','confidence'])
+        for row, value in df.iterrows():
+            pass
         df.to_csv(path)
         return timeCreatingRule, timeComputingMeasure
 

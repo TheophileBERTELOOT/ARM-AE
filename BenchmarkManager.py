@@ -46,7 +46,7 @@ class BenchmarkManager():
         for ruleIndex in range(len(self.exhauRules)):
             rule = self.exhauRules.loc[ruleIndex]
 
-            if len(rule['consequents'])==1 and  nbRulesFind[len(list(rule['antecedents']))-1][list(rule['consequents'])[0]]<nbRules:
+            if len(rule['consequents'])==1:
                 temp.append({'antecedent':sorted(list(rule['antecedents'])),
                              'consequent':list(rule['consequents']),
                              'support':round(rule['support'],3),
@@ -90,7 +90,7 @@ class BenchmarkManager():
         nbNotNull = len(nnR[nnR['support']>0])
         nnAvgSupp =  np.mean(nnR['support'])
         nnAvgConf = np.mean(nnR['confidence'])
-        percentageNotNull = round(nbNotNull/len(nnR),2)
+        percentageNotNull = round(nbNotNull/len(nnR),2) *100
         print(nnR)
         print('nbNotNull')
         print(nbNotNull)
