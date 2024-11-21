@@ -10,7 +10,7 @@ from mlxtend.frequent_patterns import apriori, fpmax, fpgrowth
 from mlxtend.frequent_patterns import association_rules
 import time
 
-from ARMAE import ARMAE
+from arm_ae.ARMAE import ARMAE
 
 
 class BenchmarkManager():

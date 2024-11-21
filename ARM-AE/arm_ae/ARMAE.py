@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 from torch.nn import L1Loss
 
-from AutoEncoder import *
+from arm_ae.AutoEncoder import *
 
 import copy
 import time
